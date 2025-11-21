@@ -51,30 +51,28 @@ Hybrid-RAG is structured to handle the end-to-end flow of data from extraction t
    - `app/utils/custom_logging.py` provides logging across the application.  
    - `app/utils/string_to_dict_parser.py` includes helper functions for converting string data into dictionary structures.  
 
----
-
 ### File Structure
 
 hybrid-rag/
-├── config.py                  # Central configuration
-├── docker-compose.yaml        # Docker Compose setup
-├── Dockerfile                 # Docker image definition
-├── main.py                    # Entry point for your app
-├── requirements.txt           # Dependencies
-├── setup.py                   # Package installer
+├── config.py # Central configuration
+├── docker-compose.yaml # Docker Compose setup
+├── Dockerfile # Docker image definition
+├── main.py # Entry point for your app
+├── requirements.txt # Dependencies
+├── setup.py # Package installer
 └── app/
-    ├── utils/
-    │   ├── custom_logging.py
-    │   ├── data_processess.py
-    │   ├── extract_data_from_source.py
-    │   ├── setup_db.py
-    │   ├── string_to_dict_parser.py
-    │   └── vector_db.py
-    └── models/
-        ├── embedding_bge_m3.py
-        ├── embedding_miniLM_L6_v2.py
-        ├── embedding_mpNet-base-v2.py
-        └── language_model.py
+├── utils/
+│ ├── custom_logging.py
+│ ├── data_processess.py
+│ ├── extract_data_from_source.py
+│ ├── setup_db.py
+│ ├── string_to_dict_parser.py
+│ └── vector_db.py
+└── models/
+├── embedding_bge_m3.py
+├── embedding_miniLM_L6_v2.py
+├── embedding_mpNet-base-v2.py
+└── language_model.py
 
 Below is the architecture of Hybrid-RAG, showing how the components interact:
 
