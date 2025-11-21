@@ -52,7 +52,7 @@ Hybrid-RAG is structured to handle the end-to-end flow of data from extraction t
    - `app/utils/string_to_dict_parser.py` includes helper functions for converting string data into dictionary structures.  
 
 ### File Structure
-
+```
 hybrid-rag/
 ├── config.py # Central configuration
 ├── docker-compose.yaml # Docker Compose setup
@@ -73,6 +73,7 @@ hybrid-rag/
 ├── embedding_miniLM_L6_v2.py
 ├── embedding_mpNet-base-v2.py
 └── language_model.py
+```
 
 Below is the architecture of Hybrid-RAG, showing how the components interact:
 
