@@ -1,0 +1,30 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Core typing & utils
+typing-extensions>=4.15.0
+pydantic>=2.12.4
+
+# FastAPI Web Framework
+fastapi>=0.111.0
+uvicorn>=0.26.1
+xmltodict>=1.0.2
+
+# Data & DB
+pandas>=2.3.3
+SQLAlchemy>=2.0.44
+psycopg2-binary>=2.9.10
+
+# LangChain & Vector DB
+langchain>=1.0.5
+pinecone>=8.0.0
+langgraph>=1.0.3
+langchain-experimental>=0.4.0
+langchain-google-genai>=3.1.0
+
+# Embeddings / Transformers
+sentence-transformers>=5.1.2
+
+# CPU-only PyTorch
+torch>=2.6.0
+transformers>=4.57.1
+safetensors>=0.4.3  

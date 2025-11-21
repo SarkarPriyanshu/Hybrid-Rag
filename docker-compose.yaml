@@ -1,0 +1,65 @@
+services:
+  rag-app:
+    build: .
+    container_name: rag_app
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+      PORT: 8000
+
+      # Postgres
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_URL: ${DB_URL}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL_NAME: ${LLM_MODEL_NAME}
+      VECTOR_DB_API_KEY: ${VECTOR_DB_API_KEY}
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    volumes:
+      - ./app/data:/hybrid-rag/app/data
+
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+    networks:
+      - rag_net
+
+  db:
+    image: postgres:16
+    container_name: postgres_db
+
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+    networks:
+      - rag_net
+
+volumes:
+  pgdata:
+
+networks:
+  rag_net:
+    driver: bridge
