@@ -78,7 +78,7 @@ hybrid-rag/
 
 Below is the architecture of Hybrid-RAG, showing how the components interact:
 
-![Hybrid-RAG Architecture](https://your-image-url-here)
+![Hybrid-RAG Architecture](https://github.com/SarkarPriyanshu/Hybrid-Rag/blob/main/architecture.png?raw=true)
 
 ## Installation
 
