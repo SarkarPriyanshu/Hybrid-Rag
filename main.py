@@ -313,5 +313,5 @@ async def validate_xlsx(file: UploadFile = File(...)):
         event.end()
     # Flush queued events
     langfuse.flush()
-
-    return {"message": "Validation completed and metrics sent to Langfuse.", "result": results}
+    logger.info(f"results : {results}")
+    return {"message": "Validation completed and metrics sent to Langfuse."}

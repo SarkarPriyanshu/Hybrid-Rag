@@ -12,7 +12,7 @@ class GeneralConfig:
             "https://dailymed.nlm.nih.gov/dailymed/services/v2"
         )
         self.max_rows: int = int(os.getenv("MAX_ROWS", 1000))
-        self.page_size: int = int(os.getenv("PAGE_SIZE", 5))
+        self.page_size: int = int(os.getenv("PAGE_SIZE", 10))
         self.page_no: int = int(os.getenv("PAGE_NO", 1))
         
         # Use a consistent path
