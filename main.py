@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, File, UploadFile
 from fastapi.responses import FileResponse
 from app.utils.data_preprocess import build_text_data
 from app.models.embeddings_miniLM_l6_v2 import MiniLMEmbeddings
@@ -6,12 +6,19 @@ from app.models.language_model import query_google_llm
 from app.utils.extract_data_from_source import extract_spl_info
 from app.utils.vector_db import PineconeVectorDB
 from app.utils.setup_db import PostgresDB
+from langfuse import Langfuse
+from langfuse import get_client 
+from ragas import SingleTurnSample, EvaluationDataset, evaluate
+from ragas.metrics import answer_relevancy, faithfulness, context_precision, context_recall
+from app.models.ragas_model import GeminiRagasLLM, MiniLMRagasEmbeddings
 from app.utils.custom_logging import logger
 from config import config
 import httpx
-import xmltodict
 import pandas as pd
+from io import BytesIO
+import xmltodict
 import os
+import math
 import asyncio
 
 # --------------------------
@@ -20,12 +27,22 @@ import asyncio
 app = FastAPI(title="DailyMed SPL CSV Generator")
 logger.info("[INIT] FastAPI app created: DailyMed SPL CSV Generator")
 
+
 # --------------------------
 # Config
 # --------------------------
 general = config.components['general']
 db_conf = config.components['db']
 vector_db_api_key = config.components['vectordb'].vector_db_api_key
+
+lf = Langfuse(
+    public_key=config.components['validate'].langfuse_public_key,
+    secret_key=config.components['validate'].langfuse_secret_key,
+    base_url=config.components['validate'].langfuse_base_url
+)
+
+langfuse = get_client()
+
 
 DATA_FOLDER = general.data_folder
 CSV_PATH = general.csv_path
@@ -46,7 +63,7 @@ logger.info(f"[CONFIG] DB_TABLE_NAME={DB_TABLE_NAME}")
 # Global objects
 postgres_db: PostgresDB = None
 embedding_model: MiniLMEmbeddings = None
-pinecone_db: PineconeVectorDB = None  # <-- make Pinecone global
+pinecone_db: PineconeVectorDB = None  
 
 # Startup: DB & Embedding model
 @app.on_event("startup")
@@ -152,51 +169,149 @@ async def generate_csv():
 # Ask Endpoint
 @app.get("/ask")
 async def ask_user(query: str = Query(..., description="User query for RAG")):
-    """
-    Endpoint to receive a user query and return an answer.
-    Uses PostgresDB.query_with_llm to convert natural language to SQL and fetch results.
-    Returns structured JSON with column names and row values.
-    """
     global pinecone_db
-    if not postgres_db:
-        return {
-            "query": query,
-            "db_answer": [],
-            "vector_answer": [],
-            "llm_response": "PostgreSQL client not initialized yet.",
-            "sources": []
-        }
 
+    # Start a new span / trace context
+    with langfuse.start_as_current_span(name="user_rag_query") as span:
+        # Log input
+        span.update(input={"user_query": query})
+
+        if not postgres_db:
+            span.update(status_message="Postgres client not initialized")
+            return {
+                "query": query,
+                "db_answer": [],
+                "vector_answer": [],
+                "llm_response": "PostgreSQL client not initialized yet.",
+                "sources": []
+            }
+
+        # Postgres retrieval
+        with langfuse.start_as_current_span(name="postgres_retrieval") as p_span:
+            raw_result = postgres_db.query_with_llm(query)
+            p_span.update(output={"raw_result": raw_result})
+
+        # Vector DB retrieval
+        with langfuse.start_as_current_span(name="vector_retrieval") as v_span:
+            vector_context = []
+            if pinecone_db:
+                vector_context = pinecone_db.query(query, k=5)
+            v_span.update(output={"vector_context": vector_context})
+
+        # LLM generation
+        with langfuse.start_as_current_generation(
+            name="llm_generation",
+            model=config.components['llm'].model_name,
+            input={
+                "db_answer": raw_result,
+                "vector_context": vector_context,
+                "user_query": query
+            },
+        ) as gen:
+            llm_response = query_google_llm(
+                db_answer=raw_result,
+                vector_context=vector_context,
+                user_query=query
+            )
+            gen.update(
+                output=llm_response,
+            )
+
+    return {
+        "query": query,
+        "db_answer": raw_result,
+        "vector_answer": vector_context,
+        "llm_response": llm_response,
+        "sources": ["postgres", "vector"]
+    }
+
+@app.post("/validate")
+async def validate_xlsx(file: UploadFile = File(...)):
+    global pinecone_db, postgres_db, embedding_model
+
+    # Validate file type
+    filename = file.filename.lower()
+    if not filename.endswith(".xlsx"):
+        return {"error": "Only .xlsx files are supported."}
+
+    # Read Excel
     try:
-        # Run NL -> SQL -> Postgres
-        raw_result = postgres_db.query_with_llm(query)
+        contents = await file.read()
+        df = pd.read_excel(BytesIO(contents))
+    except Exception as e:
+        return {"error": f"Failed to read Excel file: {e}"}
 
-        # Query vector DB (Pinecone)
-        vector_context = []
-        if pinecone_db:
-            vector_context = pinecone_db.query(query, k=5)
+    # Normalize columns
+    df.columns = [c.strip().lower() for c in df.columns]
+    if "query" not in df.columns or "groundtruth" not in df.columns:
+        return {"error": "Excel must contain 'query' and 'groundtruth' columns."}
 
-        # LLM combines context
-        llm_response = query_google_llm(
-            db_answer=raw_result,
-            vector_context=vector_context,
-            user_query=query
+    eval_data = []
+    for idx, row in df.iterrows():
+        q = row["query"]
+        gt = row["groundtruth"]
+
+        await asyncio.sleep(7)
+        raw = postgres_db.query_with_llm(q)
+        context = pinecone_db.query(q, k=5) if pinecone_db else []
+        await asyncio.sleep(7)
+
+        response = query_google_llm(
+            db_answer=raw,
+            vector_context=context,
+            user_query=q
         )
 
-        return {
-            "query": query,
-            "db_answer": raw_result,
-            "vector_answer": vector_context,
-            "llm_response": llm_response,
-            "sources": ["postgres", "vector"]
-        }
+        eval_data.append({
+            "question": q,
+            "answer": response,
+            "contexts": context,
+            "ground_truth": gt
+        })
 
-    except Exception as e:
-        logger.error(f"[ASK ERROR] Failed to run query_with_llm: {str(e)}")
-        return {
-            "query": query,
-            "db_answer": [],
-            "vector_answer": [],
-            "llm_response": f"Error processing your query: {str(e)}",
-            "sources": []
-        }
+    samples = [
+        SingleTurnSample(
+            user_input=s["question"],
+            retrieved_contexts=[s["contexts"]],
+            response=s["answer"],
+            reference=s["ground_truth"]
+        )
+        for s in eval_data
+    ]
+
+    ragas_dataset = EvaluationDataset(samples=samples)
+    gemini_llm = GeminiRagasLLM()
+    minilm_embeddings = MiniLMRagasEmbeddings(embedding_model)
+
+    results = evaluate(
+        ragas_dataset,
+        metrics=[answer_relevancy, faithfulness, context_precision, context_recall],
+        llm=gemini_llm,
+        embeddings=minilm_embeddings
+    )
+
+    # Clean results for JSON / Langfuse
+    clean_scores = {}
+    for k, v in results._scores_dict.items():
+        if isinstance(v, float) and math.isnan(v):
+            clean_scores[k] = None
+        else:
+            clean_scores[k] = round(v, 4) if isinstance(v, float) else v
+
+    # Send to Langfuse: use `end()` instead of `send()`
+    for sample in ragas_dataset.samples:
+        event = langfuse.create_event(
+            name="llm_validation",
+            metadata={
+                "question": sample.user_input,
+                "ground_truth": sample.reference,
+                "answer": sample.response,
+                "evaluation": clean_scores,
+                "contexts": sample.retrieved_contexts
+            }
+        )
+        event.end()
+    # Flush queued events
+    langfuse.flush()
+
+    return {"message": "Validation completed and metrics sent to Langfuse.", "result": results}

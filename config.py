@@ -78,6 +78,15 @@ class VectorDBConfig:
         self.index_path: str = os.getenv("VECTOR_INDEX_PATH", "./data/index.faiss")
         self.embedding_model: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
+# -----------------------------
+# Validation Configuration
+# -----------------------------
+class ValidationConfig:
+    def __init__(self):
+        self.langfuse_secret_key: str = os.getenv("LANGFUSE_SECRET_KEY", "")
+        self.langfuse_public_key: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+        self.langfuse_base_url: str = os.getenv("LANGFUSE_BASE_URL", "")
+        self.langfuse_project_name: str = os.getenv("LANGFUSE_PROJECT_NAME", "")        
 
 # -----------------------------
 # Main Config Wrapper
@@ -92,6 +101,7 @@ class Config:
             "kafka": KafkaConfig(),
             "llm": LLMConfig(),
             "db": DBConfig(),
+            "validate": ValidationConfig(),
             "vectordb": VectorDBConfig(),
         }
 

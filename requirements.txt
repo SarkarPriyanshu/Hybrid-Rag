@@ -8,6 +8,8 @@ pydantic>=2.12.4
 fastapi>=0.111.0
 uvicorn>=0.26.1
 xmltodict>=1.0.2
+python-multipart>=0.0.20
+openpyxl>=3.1.5
 
 # Data & DB
 pandas>=2.3.3
@@ -27,4 +29,11 @@ sentence-transformers>=5.1.2
 # CPU-only PyTorch
 torch>=2.6.0
 transformers>=4.57.1
-safetensors>=0.4.3  
+safetensors>=0.4.3
+
+# Langfuse + RAGAS
+langfuse>=3.10.1
+ragas>=0.3.9
+
+# Optional for evaluation datasets
+datasets>=2.14.0
